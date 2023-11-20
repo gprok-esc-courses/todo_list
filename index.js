@@ -9,6 +9,8 @@ let secret = process.env.SECRET
 const app = express()
 app.use(express.json())
 app.use(session({secret: secret}))
+app.set('view engine', 'ejs')
+app.use(express.urlencoded())
 
 let User = require('./models/user')
 
@@ -19,9 +21,16 @@ let port = process.env.PORT
 
 mongoose.connect('mongodb+srv://' + username + ':' + password + '@cluster0.jnw32.mongodb.net/' + db)
 
+function getUsername(req) {
+    return req.session.username ? req.session.username : ''
+}
 
 app.get("/", (req, res) => {
-    res.send("<h1>Home Page</h1>");
+    res.render('pages/home', {title: 'Home', username: getUsername(req)})
+})
+
+app.get("/about", (req, res) => {
+    res.render('pages/about', {title: 'About', username: getUsername(req)})
 })
 
 app.post("/register", async (req, res) => {
@@ -43,20 +52,31 @@ app.post("/register", async (req, res) => {
     })
 })
 
+app.get("/login", (req, res) => {
+    res.render('pages/login')
+})
+
 app.post("/login", async (req, res) => {
     const user = await User.findOne({'username': req.body.username}).exec();
-    bcrypt.compare(req.body.password, user.password, (err, result) => {
-        console.log(result)
-        if(result == true) {
-            req.session.username = req.body.username
-            return res.json({'result': 'ok'})
-        }
-        else {
-            return res.json({'result': 'wrong password'})
-        }
-    })
-    console.log(user.password)
+    if(user != null) {
+        bcrypt.compare(req.body.password, user.password, (err, result) => {
+            console.log(result)
+            if(result == true) {
+                req.session.username = req.body.username
+                return res.json({'result': 'ok'})
+            }
+            else {
+                return res.json({'result': 'wrong password'})
+            }
+        })
+        console.log(user.password)
+    }
+    else {
+        return res.json({'result': 'wrong user'})
+    }
 })
+
+
 
 app.get("/dashboard", (req, res) => {
     if(req.session.username) {
@@ -72,6 +92,20 @@ app.get("/logout", (req, res) => {
     res.json({'result': 'ok', 'content': 'logged out'})
 })
 
+
+app.get("/users/back", async (req, res) => {
+    const users = await User.find({}).exec()
+    res.render('pages/users_back', {users: users})
+})
+
+app.get("/api/users", async (req, res) => {
+    const users = await User.find({}).exec()
+    res.json(users)
+})
+
+app.get("/users/front", (req, res) => {
+    res.render('pages/users_front')
+})
 
 app.listen(port, () => {
     console.log("Server started on port " + port);
